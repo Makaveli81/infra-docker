@@ -1,0 +1,142 @@
+# Définition des services à déployer avec Docker Compose
+
+services:
+  # Service Nginx Proxy Manager
+  nginx_proxy_manager:
+    # Image Docker de Nginx Proxy Manager
+    image: jc21/nginx-proxy-manager:latest
+    # Redémarrer automatiquement sauf si l'utilisateur arrête le conteneur
+    restart: unless-stopped
+    container_name: nginx-proxy-manager  # Nom du conteneur
+    networks:
+      - my-network  # Le réseau Docker auquel appartient ce conteneur
+    environment:
+      - DISABLE_IPV6=${DISABLE_IPV6}  # Variable d'environnement pour gérer l'IPv6
+    volumes:
+      # Montage des volumes pour stocker les données persistantes de Nginx Proxy Manager
+      - ${VOLUMES_PATH}/nginx/data:/data
+      - ${VOLUMES_PATH}/nginx/letsencrypt:/etc/letsencrypt
+    ports:
+      # Exposition des ports pour accéder à Nginx Proxy Manager et gérer les proxy
+      - "80:80"    # HTTP
+      - "443:443"  # HTTPS
+      - "81:81"    # Interface d'administration
+
+  # Service Nextcloud (version "all-in-one")
+  nextcloud:
+    image: nextcloud/all-in-one:latest
+    restart: unless-stopped
+    container_name: nextcloud-aio-mastercontainer
+    depends_on:
+      # Ce service dépend de Nginx Proxy Manager et du service LDAP
+      - nginx_proxy_manager
+      - lldap
+    networks:
+      - my-network
+    volumes:
+      # Stockage persistant pour la configuration de Nextcloud
+      - nextcloud_aio_mastercontainer:/mnt/docker-aio-config
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Permet à Nextcloud d'interagir avec Docker
+    ports:
+      - "8080:8080"  # Port d'accès pour Nextcloud
+    environment:
+      - APACHE_PORT=${APACHE_PORT}  # Variable d'environnement pour le port Apache
+
+  # Service LDAP (Light LDAP)
+  lldap:
+    image: lldap/lldap:stable
+    container_name: lldap
+    networks:
+      - my-network
+    ports:
+      - "17170:17170"  # Port d'accès au service LDAP
+    volumes:
+      - ${VOLUMES_PATH}/lldap:/data  # Montage d'un volume pour les données LDAP
+    environment:
+      - UID=${UID}  # ID utilisateur
+      - GID=${GID}  # ID groupe
+      - TZ=${TZ}    # Fuseau horaire
+      # Autres paramètres pour configurer le service LDAP
+      - LLDAP_JWT_SECRET=${LLDAP_JWT_SECRET}
+      - LLDAP_KEY_SEED=${LLDAP_KEY_SEED}
+      - LLDAP_LDAP_BASE_DN=${LLDAP_LDAP_BASE_DN}
+      - LLDAP_LDAP_USER_PASS=${LLDAP_LDAP_USER_PASS}
+    restart: always  # Redémarre toujours le service si nécessaire
+
+  # Service de serveur de messagerie Poste.io
+  mailserver:
+    image: analogic/poste.io
+    container_name: mailserver
+    restart: unless-stopped
+    networks:
+      - my-network
+    ports:
+      # Ports nécessaires pour gérer le courrier électronique (SMTP, IMAP, POP3, etc.)
+      - "25:25"
+      - "8081:443"
+      - "110:110"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+      - "995:995"
+      - "4190:4190"
+    environment:
+      # Configuration du certificat SSL avec Let's Encrypt
+      - HTTPS=${HTTPS}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+      - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
+      - VIRTUAL_HOST=${VIRTUAL_HOST}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro  # Utilisation de l'heure locale du système hôte
+      - ${VOLUMES_PATH}/mail:/data  # Volume pour les données de messagerie
+
+  # Service Keycloak (gestion des identités et des accès)
+  keycloak:
+    container_name: keycloak_app
+    image: quay.io/keycloak/keycloak:latest
+    restart: always
+    networks:
+      - my-network
+    ports:
+      - "8082:8080"  # Port d'accès à l'interface d'administration Keycloak
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_USER}  # Nom de l'administrateur Keycloak
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_PASSWORD}  # Mot de passe de l'administrateur
+      - KC_HOSTNAME=${KEYCLOAK_URL}  # URL de Keycloak
+      - KC_DB_URL=jdbc:postgresql://keycloak_postgres:5432/keycloak  # Connexion à la base de données PostgreSQL
+      - KC_DB=postgres
+      - KC_DB_USERNAME=${POSTGRES_USER}
+      - KC_DB_PASSWORD=${POSTGRES_PASSWORD}
+      - KC_HTTP_ENABLED=true  # Activer HTTP (pas HTTPS ici)
+      - KC_HTTPS_ENABLED=false
+    depends_on:
+      - keycloak_postgres  # Dépendance à la base de données PostgreSQL
+    command: >
+      start --proxy-headers xforwarded  # Configuration des en-têtes pour les proxys
+
+  # Service PostgreSQL pour Keycloak
+  keycloak_postgres:
+    container_name: keycloak_postgres
+    image: postgres:latest
+    restart: always
+    networks:
+      - my-network
+    environment:
+      - POSTGRES_DB=keycloak  # Nom de la base de données
+      - POSTGRES_USER=${POSTGRES_USER}  # Utilisateur PostgreSQL
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}  # Mot de passe PostgreSQL
+      - POSTGRES_PORT=5432  # Port PostgreSQL
+    volumes:
+      - ${VOLUMES_PATH}/postgres:/var/lib/postgresql/data  # Stockage des données PostgreSQL
+
+# Définition du réseau Docker
+networks:
+  my-network:
+    name: my-network  # Nom du réseau
+    driver: bridge  # Type de réseau Docker
+
+# Définition des volumes pour stocker les données persistantes
+volumes:
+  nextcloud_aio_mastercontainer:
+    name: nextcloud_aio_mastercontainer  # Volume requis pour Nextcloud AIO
