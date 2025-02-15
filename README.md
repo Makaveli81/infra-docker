@@ -1,6 +1,6 @@
-# 🚀 Infrastructure Docker avec Authentification Unifiée
+# 🚀 Infrastructure Docker avec authentification unifiée
 
-![Schéma de Principe](schema.png)
+![Schéma de Principe](IMG/schema.png)
 
 📌 **Projet auto-hébergé** permettant de déployer une infrastructure complète avec **Nextcloud**, **LDAP**, **Nginx Proxy Manager**, **Keycloak** et **Poste.IO** via **Docker Compose**.
 🔐 **Authentification centralisée** grâce à **Light LDAP** et **Keycloak** pour une gestion unifiée des utilisateurs.
@@ -35,7 +35,7 @@
 
 ---
 
-## Services Déployés
+## Services déployés
 | Service                 | Rôle | Accès par défaut |
 |-------------------------|------|-----------------|
 | **Nextcloud**           | Cloud personnel | `http://localhost:8080` |
@@ -48,7 +48,7 @@
 
 ## Installation
 ### Prérequis
-✅ **Serveur avec Docker & Docker Compose**
+✅ **Serveur avec docker & docker compose**
 ✅ **Portainer (optionnel)**
 ✅ **Nom de domaine configuré (pour HTTPS et les emails)**
 
@@ -64,9 +64,9 @@
 
 ---
 
-## 🔑 Configuration de l'Authentification Unifiée
+## 🔑 Configuration de l'authentification unifiée
 
-### Création du Realm dans Keycloak
+### Création du realm dans Keycloak
 1. Connectez-vous à l'interface d'administration de Keycloak.
 2. Cliquez sur **Create Realm**.
 3. Donnez un nom au Realm, par exemple `nextcloud`.
